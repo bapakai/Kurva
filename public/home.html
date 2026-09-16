@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>KURVA — Beranda</title>
+<link rel="icon" href="/assets/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/kurva.css">
+<style>
+  .hero { padding: var(--space-6) var(--space-5) var(--space-4); }
+  .hero h1 { font-size: 22px; font-weight: 800; margin: 0 0 var(--space-4); line-height: 1.3; }
+
+  .region-switcher { display: flex; gap: var(--space-2); overflow-x: auto; padding-bottom: var(--space-1); margin-bottom: var(--space-5); scrollbar-width: none; }
+  .region-switcher::-webkit-scrollbar { display: none; }
+  .region-chip { flex-shrink: 0; }
+  .region-chip.disabled { opacity: 0.55; cursor: default; }
+  .region-chip .soon { font-size: 9px; font-weight: 700; margin-left: 4px; }
+
+  .summary-card {
+    background: linear-gradient(135deg, var(--navy) 0%, #0B2A52 100%);
+    color: #fff;
+    border-radius: var(--radius-xl);
+    padding: var(--space-5);
+    margin-bottom: var(--space-6);
+  }
+  .summary-card .label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--orange); margin-bottom: var(--space-2); }
+  .summary-card p { margin: 0; font-size: 15px; line-height: 1.55; color: rgba(255,255,255,0.92); }
+
+  .section-title { display: flex; align-items: baseline; justify-content: space-between; padding: 0 var(--space-5); margin-bottom: var(--space-3); }
+  .section-title h2 { font-size: 16px; font-weight: 700; margin: 0; }
+  .section-title a { font-size: 13px; font-weight: 600; color: var(--blue); }
+
+  .tempat-scroll { display: flex; gap: var(--space-3); overflow-x: auto; padding: 0 var(--space-5) var(--space-2); scrollbar-width: none; margin-bottom: var(--space-6); }
+  .tempat-scroll::-webkit-scrollbar { display: none; }
+  .tempat-card { flex-shrink: 0; width: 200px; }
+  .tempat-card .thumb { height: 96px; border-radius: var(--radius-md); margin-bottom: var(--space-2); }
+  .tempat-card .cat { font-size: 11px; font-weight: 700; color: var(--blue); text-transform: uppercase; margin-bottom: 2px; }
+  .tempat-card .title { font-size: 14px; font-weight: 700; margin: 0 0 4px; line-height: 1.3; }
+  .tempat-card .meta { font-size: 12px; color: var(--text-secondary); }
+
+  .berita-list { padding: 0 var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); }
+  .berita-item { display: flex; gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+  .berita-item:last-child { border-bottom: none; }
+  .berita-item .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--orange); margin-top: 8px; flex-shrink: 0; }
+  .berita-item .title { font-size: 14px; font-weight: 700; margin: 0 0 4px; line-height: 1.35; }
+  .berita-item .summary { font-size: 13px; color: var(--text-secondary); line-height: 1.4; margin: 0 0 4px; }
+  .berita-item .source { font-size: 11px; color: var(--disabled); font-weight: 600; }
+
+  .empty-state { padding: var(--space-8) var(--space-5); text-align: center; color: var(--text-secondary); font-size: 14px; }
+  .error-state { margin: 0 var(--space-5) var(--space-5); padding: var(--space-4); background: #FFF4EF; border: 1px solid #FFD8C2; border-radius: var(--radius-md); font-size: 13px; color: #9A3412; }
+</style>
+</head>
+<body>
+  <div class="kurva-topbar">
+    <img class="wordmark" src="/assets/logo/KURVA_wordmark_transparent.png" alt="KURVA" style="height:20px;">
+    <span class="kurva-region-pill" id="regionPill">📍 Bintaro</span>
+  </div>
+
+  <div class="hero">
+    <h1 id="heroQuestion">Ada apa di Bintaro hari ini?</h1>
+
+    <div class="region-switcher">
+      <span class="chip active" data-region="bintaro">Bintaro</span>
+      <span class="chip disabled" title="Segera hadir">BSD <span class="soon">SEGERA</span></span>
+      <span class="chip disabled" title="Segera hadir">Kemang <span class="soon">SEGERA</span></span>
+    </div>
+
+    <div class="summary-card">
+      <div class="label">✦ Ringkasan pagi ini</div>
+      <p id="summaryText">Memuat ringkasan kawasan…</p>
+    </div>
+  </div>
+
+  <div id="errorBox"></div>
+
+  <div class="section-title">
+    <h2>Tempat di sekitarmu</h2>
+    <a href="/jelajah-detail.html?tab=jelajah&category=tempat">Lihat semua</a>
+  </div>
+  <div class="tempat-scroll" id="tempatScroll">
+    <div class="tempat-card"><div class="thumb skeleton"></div></div>
+    <div class="tempat-card"><div class="thumb skeleton"></div></div>
+  </div>
+
+  <div class="section-title">
+    <h2>Berita kawasan</h2>
+    <a href="/jelajah-detail.html?tab=jelajah&category=berita">Lihat semua</a>
+  </div>
+  <div class="berita-list" id="beritaList">
+    <div class="skeleton" style="height:56px;"></div>
+    <div class="skeleton" style="height:56px;"></div>
+  </div>
+
+  <nav class="kurva-bottomnav">
+    <a href="/home.html" class="active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+      Beranda
+    </a>
+    <a href="/jelajah-detail.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      Jelajah
+    </a>
+    <a href="/simpan.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9Z"/></svg>
+      Simpan
+    </a>
+    <a href="/profil.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4.5 5-6 8-6s6.5 1.5 8 6"/></svg>
+      Profil
+    </a>
+  </nav>
+
+  <script src="/assets/kurva-api.js"></script>
+  <script>
+    (function redirectIfNotOnboarded() {
+      try {
+        if (!localStorage.getItem('kurva_onboarded')) {
+          window.location.href = '/onboarding.html';
+        }
+      } catch (_) { /* storage unavailable — just continue */ }
+    })();
+
+    async function loadHome() {
+      try {
+        const data = await kurvaFetchSignals({ tier: 'sekitar' });
+        const signals = data.signals || [];
+
+        document.getElementById('heroQuestion').textContent = `Ada apa di ${data.region?.name || 'Bintaro'} hari ini?`;
+        document.getElementById('regionPill').textContent = `📍 ${data.region?.name || 'Bintaro'}`;
+
+        const berita = signals.filter((s) => s.category === 'berita').sort((a, b) => b.relevance_score - a.relevance_score);
+        const tempat = signals.filter((s) => s.category === 'tempat').sort((a, b) => b.relevance_score - a.relevance_score);
+
+        // "Ringkasan pagi ini" — MVP heuristic: highest-relevance item's own
+        // AI-written summary stands in for a daily digest. A dedicated
+        // multi-item digest pass is a natural next enrichment step, not yet
+        // built into api/signals.js.
+        const top = [...signals].sort((a, b) => b.relevance_score - a.relevance_score)[0];
+        document.getElementById('summaryText').textContent = top
+          ? top.summary
+          : `Belum ada sinyal baru di ${data.region?.name || 'kawasan ini'} hari ini.`;
+
+        renderTempat(tempat);
+        renderBerita(berita);
+      } catch (err) {
+        console.error(err);
+        document.getElementById('errorBox').innerHTML =
+          `<div class="error-state">Gagal memuat data KURVA: ${err.message}</div>`;
+        document.getElementById('summaryText').textContent = 'Ringkasan tidak tersedia saat ini.';
+        document.getElementById('tempatScroll').innerHTML = '<div class="empty-state">—</div>';
+        document.getElementById('beritaList').innerHTML = '<div class="empty-state">—</div>';
+      }
+    }
+
+    function renderTempat(items) {
+      const el = document.getElementById('tempatScroll');
+      if (items.length === 0) {
+        el.innerHTML = '<div class="empty-state">Belum ada tempat baru di radius ini.</div>';
+        return;
+      }
+      el.innerHTML = items.slice(0, 8).map((s) => `
+        <div class="tempat-card">
+          <div class="thumb" style="background: linear-gradient(135deg, #EAF3FF, #D8E8FF); display:flex; align-items:center; justify-content:center; font-size:24px;">📍</div>
+          <div class="cat">${s.is_new ? '<span class="badge-new">Baru buka</span>' : 'Tempat'}</div>
+          <p class="title">${escapeHtml(s.title)}</p>
+          <div class="meta">${s.distance_m ? Math.round(s.distance_m) + ' m' : ''}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderBerita(items) {
+      const el = document.getElementById('beritaList');
+      if (items.length === 0) {
+        el.innerHTML = '<div class="empty-state">Belum ada berita kawasan hari ini.</div>';
+        return;
+      }
+      el.innerHTML = items.slice(0, 6).map((s) => `
+        <div class="berita-item">
+          <div class="dot"></div>
+          <div>
+            <p class="title">${escapeHtml(s.title)}</p>
+            <p class="summary">${escapeHtml(s.summary || '')}</p>
+            <div class="source">${escapeHtml(s.source_name || '')}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str || '';
+      return div.innerHTML;
+    }
+
+    loadHome();
+  </script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KURVA — Lihat Sekitarmu</title>
+<link rel="icon" href="/assets/icons/favicon-32.png">
+</head>
+<body>
+<script>
+  try {
+    window.location.replace(localStorage.getItem('kurva_onboarded') ? '/home.html' : '/onboarding.html');
+  } catch (_) {
+    window.location.replace('/onboarding.html');
+  }
+</script>
+<noscript><meta http-equiv="refresh" content="0; url=/onboarding.html"></noscript>
+</body>
+</html>

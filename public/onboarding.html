@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>KURVA — Lihat Sekitarmu</title>
+<meta name="description" content="KURVA: local intelligence layer buat kawasan Bintaro. Apa yang sedang terjadi di sekitarmu, disimpulkan bukan sekadar ditunjukkan.">
+<link rel="icon" href="/assets/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/kurva.css">
+<style>
+  body { max-width: none; padding-bottom: 0; }
+  .onboarding-screen {
+    min-height: 100vh;
+    min-height: 100dvh;
+    background: linear-gradient(160deg, #0B2A52 0%, var(--navy) 55%, #001C3D 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-10) var(--space-6) var(--space-8);
+    text-align: center;
+  }
+  .onboarding-top { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-8); width: 100%; max-width: 380px; }
+  .logo-card {
+    background: #fff;
+    border-radius: var(--radius-xl);
+    padding: var(--space-6) var(--space-8);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+  }
+  .logo-card img { height: 40px; display: block; }
+  .onboarding-copy h1 {
+    color: #fff;
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1.3;
+    margin: 0 0 var(--space-3);
+  }
+  .onboarding-copy p {
+    color: rgba(255,255,255,0.72);
+    font-size: 15px;
+    line-height: 1.55;
+    margin: 0;
+  }
+  .onboarding-cta { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: var(--space-3); }
+  .onboarding-cta .btn-primary { width: 100%; padding: 16px; font-size: 16px; }
+  .onboarding-tagline { color: rgba(255,255,255,0.5); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; margin-top: var(--space-2); }
+</style>
+</head>
+<body>
+  <div class="onboarding-screen">
+    <div class="onboarding-top">
+      <div class="logo-card">
+        <img class="wordmark" src="/assets/logo/KURVA_wordmark_transparent.png" alt="KURVA">
+      </div>
+      <div class="onboarding-copy">
+        <h1>Melihat sekitar dengan lebih jelas.</h1>
+        <p>KURVA menyimpulkan apa yang sedang terjadi di kawasanmu — bukan cuma daftar tempat, tapi konteks yang relevan buat hari ini.</p>
+      </div>
+    </div>
+    <div class="onboarding-cta">
+      <button class="btn-primary" id="startBtn">Mulai Jelajahi Bintaro →</button>
+      <div class="onboarding-tagline">Lihat Sekitarmu.</div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('startBtn').addEventListener('click', () => {
+      try { localStorage.setItem('kurva_onboarded', '1'); } catch (_) {}
+      window.location.href = '/home.html';
+    });
+  </script>
+</body>
+</html>

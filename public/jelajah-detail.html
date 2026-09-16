@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>KURVA — Jelajah</title>
+<link rel="icon" href="/assets/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/kurva.css">
+<style>
+  .jelajah-header { padding: var(--space-5) var(--space-5) var(--space-3); }
+  .jelajah-header h1 { font-size: 20px; font-weight: 800; margin: 0 0 var(--space-4); }
+
+  .search-box {
+    display: flex; align-items: center; gap: var(--space-2);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-md); padding: 10px var(--space-4);
+    margin-bottom: var(--space-3);
+  }
+  .search-box input { border: none; outline: none; font-family: inherit; font-size: 14px; flex: 1; background: transparent; }
+  .search-box svg { width: 18px; height: 18px; color: var(--text-secondary); flex-shrink: 0; }
+
+  .filter-row { display: flex; gap: var(--space-2); overflow-x: auto; margin-bottom: var(--space-2); scrollbar-width: none; }
+  .filter-row::-webkit-scrollbar { display: none; }
+
+  .map-placeholder {
+    margin: 0 var(--space-5) var(--space-5);
+    height: 140px;
+    border-radius: var(--radius-lg);
+    background:
+      radial-gradient(circle at 30% 40%, rgba(255,90,0,0.18), transparent 40%),
+      radial-gradient(circle at 65% 65%, rgba(37,99,235,0.15), transparent 40%),
+      #E9EEF5;
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-secondary);
+    font-size: 12px;
+    text-align: center;
+    padding: var(--space-3);
+  }
+  /* Placeholder only — real map (Leaflet/OSM or Google Maps JS) is a follow-up,
+     not part of this MVP pass. Swap this block for a <div id="map"> + map lib
+     init when that's prioritized. */
+
+  .list { padding: 0 var(--space-5); display: flex; flex-direction: column; gap: var(--space-3); }
+  .signal-card { display: flex; gap: var(--space-3); cursor: pointer; }
+  .signal-card .icon {
+    width: 44px; height: 44px; border-radius: var(--radius-md); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+    background: #EAF3FF;
+  }
+  .signal-card.berita .icon { background: #FFF1E9; }
+  .signal-card .body { flex: 1; min-width: 0; }
+  .signal-card .cat-row { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--blue); text-transform: uppercase; margin-bottom: 2px; }
+  .signal-card.berita .cat-row { color: var(--orange); }
+  .signal-card .title { font-size: 14px; font-weight: 700; margin: 0 0 2px; line-height: 1.3; }
+  .signal-card .meta { font-size: 12px; color: var(--text-secondary); }
+
+  .empty-state, .error-state { margin: var(--space-4) var(--space-5); padding: var(--space-4); text-align: center; color: var(--text-secondary); font-size: 14px; }
+  .error-state { background: #FFF4EF; border: 1px solid #FFD8C2; border-radius: var(--radius-md); color: #9A3412; }
+
+  /* Detail panel */
+  .detail-overlay {
+    position: fixed; inset: 0; background: rgba(15,23,42,0.45);
+    display: none; align-items: flex-end; justify-content: center; z-index: 50;
+  }
+  .detail-overlay.open { display: flex; }
+  .detail-panel {
+    background: var(--surface); width: 100%; max-width: 480px;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    padding: var(--space-5); max-height: 82vh; overflow-y: auto;
+  }
+  .detail-panel .drag-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto var(--space-4); }
+  .detail-panel .close-btn { position: absolute; top: var(--space-4); right: var(--space-5); background: var(--bg); border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 16px; cursor: pointer; }
+  .detail-panel h2 { font-size: 19px; font-weight: 800; margin: 0 0 var(--space-2); }
+  .detail-panel .detail-meta { font-size: 13px; color: var(--text-secondary); margin-bottom: var(--space-4); }
+  .relevance-box {
+    background: linear-gradient(135deg, var(--navy), #0B2A52); color: #fff;
+    border-radius: var(--radius-lg); padding: var(--space-4); margin-bottom: var(--space-4);
+  }
+  .relevance-box .label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--orange); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .relevance-box p { margin: 0; font-size: 14px; line-height: 1.5; color: rgba(255,255,255,0.92); }
+  .detail-actions { display: flex; gap: var(--space-3); margin-top: var(--space-4); }
+  .detail-actions .btn-primary, .detail-actions .btn-secondary { flex: 1; }
+</style>
+</head>
+<body>
+  <div class="kurva-topbar">
+    <img class="wordmark" src="/assets/logo/KURVA_wordmark_transparent.png" alt="KURVA" style="height:20px;">
+    <span class="kurva-region-pill" id="regionPill">📍 Bintaro</span>
+  </div>
+
+  <div class="jelajah-header">
+    <h1>Jelajah</h1>
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="text" id="searchInput" placeholder="Cari tempat, acara, atau topik...">
+    </div>
+    <div class="filter-row" id="categoryFilter">
+      <span class="chip active" data-cat="">Semua</span>
+      <span class="chip" data-cat="tempat">Tempat</span>
+      <span class="chip" data-cat="acara">Acara</span>
+      <span class="chip" data-cat="berita">Berita</span>
+    </div>
+    <div class="filter-row" id="tierFilter">
+      <span class="chip active" data-tier="terdekat">Terdekat</span>
+      <span class="chip" data-tier="sekitar">Sekitar</span>
+      <span class="chip" data-tier="kawasan">Kawasan</span>
+    </div>
+  </div>
+
+  <div class="map-placeholder">Peta area Bintaro — tampilan interaktif menyusul</div>
+
+  <div id="listContainer" class="list">
+    <div class="skeleton" style="height:60px;"></div>
+    <div class="skeleton" style="height:60px;"></div>
+    <div class="skeleton" style="height:60px;"></div>
+  </div>
+
+  <nav class="kurva-bottomnav">
+    <a href="/home.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+      Beranda
+    </a>
+    <a href="/jelajah-detail.html" class="active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      Jelajah
+    </a>
+    <a href="/simpan.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9Z"/></svg>
+      Simpan
+    </a>
+    <a href="/profil.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4.5 5-6 8-6s6.5 1.5 8 6"/></svg>
+      Profil
+    </a>
+  </nav>
+
+  <div class="detail-overlay" id="detailOverlay">
+    <div class="detail-panel" style="position:relative;">
+      <button class="close-btn" id="closeDetail">✕</button>
+      <div class="drag-handle"></div>
+      <h2 id="detailTitle">—</h2>
+      <div class="detail-meta" id="detailMeta">—</div>
+      <div class="relevance-box">
+        <div class="label">✦ Kenapa ini relevan</div>
+        <p id="detailInsight">—</p>
+      </div>
+      <div class="detail-actions">
+        <button class="btn-secondary" id="detailSaveBtn">♡ Simpan</button>
+        <button class="btn-primary" id="detailShareBtn">Bagikan</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/kurva-api.js"></script>
+  <script>
+    try { if (!localStorage.getItem('kurva_onboarded')) window.location.href = '/onboarding.html'; } catch (_) {}
+
+    const params = new URLSearchParams(window.location.search);
+    let currentCategory = params.get('category') || '';
+    let currentTier = 'terdekat';
+    let allSignals = [];
+
+    if (currentCategory) {
+      document.querySelectorAll('#categoryFilter .chip').forEach((c) => {
+        c.classList.toggle('active', c.dataset.cat === currentCategory);
+      });
+    }
+
+    document.getElementById('categoryFilter').addEventListener('click', (e) => {
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      document.querySelectorAll('#categoryFilter .chip').forEach((c) => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentCategory = chip.dataset.cat;
+      renderList();
+    });
+
+    document.getElementById('tierFilter').addEventListener('click', (e) => {
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      document.querySelectorAll('#tierFilter .chip').forEach((c) => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentTier = chip.dataset.tier;
+      loadSignals();
+    });
+
+    document.getElementById('searchInput').addEventListener('input', renderList);
+
+    async function loadSignals() {
+      document.getElementById('listContainer').innerHTML =
+        '<div class="skeleton" style="height:60px;"></div><div class="skeleton" style="height:60px;"></div>';
+      try {
+        const data = await kurvaFetchSignals({ tier: currentTier });
+        document.getElementById('regionPill').textContent = `📍 ${data.region?.name || 'Bintaro'}`;
+        allSignals = data.signals || [];
+        renderList();
+      } catch (err) {
+        document.getElementById('listContainer').innerHTML =
+          `<div class="error-state">Gagal memuat data: ${err.message}</div>`;
+      }
+    }
+
+    function renderList() {
+      const query = document.getElementById('searchInput').value.trim().toLowerCase();
+      let items = allSignals;
+      if (currentCategory) items = items.filter((s) => s.category === currentCategory);
+      if (query) items = items.filter((s) => s.title.toLowerCase().includes(query));
+      items = [...items].sort((a, b) => b.relevance_score - a.relevance_score);
+
+      const el = document.getElementById('listContainer');
+      if (items.length === 0) {
+        el.innerHTML = '<div class="empty-state">Gak ada hasil di filter ini.</div>';
+        return;
+      }
+      el.innerHTML = items.map((s, i) => `
+        <div class="signal-card ${s.category}" data-idx="${i}">
+          <div class="icon">${s.category === 'berita' ? '📰' : s.category === 'acara' ? '🎉' : '📍'}</div>
+          <div class="body">
+            <div class="cat-row">${s.category}${s.is_new ? ' · <span class=\"badge-new\">Baru</span>' : ''}</div>
+            <p class="title">${escapeHtml(s.title)}</p>
+            <div class="meta">${s.distance_m ? Math.round(s.distance_m) + ' m dari kamu' : (s.source_name || '')}</div>
+          </div>
+        </div>
+      `).join('');
+
+      el.querySelectorAll('.signal-card').forEach((card) => {
+        card.addEventListener('click', () => openDetail(items[Number(card.dataset.idx)]));
+      });
+    }
+
+    function openDetail(signal) {
+      document.getElementById('detailTitle').textContent = signal.title;
+      document.getElementById('detailMeta').textContent =
+        `${signal.category.charAt(0).toUpperCase() + signal.category.slice(1)}${signal.source_name ? ' · ' + signal.source_name : ''}${signal.distance_m ? ' · ' + Math.round(signal.distance_m) + ' m' : ''}`;
+      document.getElementById('detailInsight').textContent = signal.summary || 'Belum ada insight untuk item ini.';
+      document.getElementById('detailShareBtn').onclick = () => {
+        if (signal.source_url && navigator.share) {
+          navigator.share({ title: signal.title, url: signal.source_url }).catch(() => {});
+        } else if (signal.source_url) {
+          window.open(signal.source_url, '_blank');
+        }
+      };
+      document.getElementById('detailOverlay').classList.add('open');
+    }
+
+    document.getElementById('closeDetail').addEventListener('click', () => {
+      document.getElementById('detailOverlay').classList.remove('open');
+    });
+    document.getElementById('detailOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'detailOverlay') e.target.classList.remove('open');
+    });
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str || '';
+      return div.innerHTML;
+    }
+
+    loadSignals();
+  </script>
+</body>
+</html>

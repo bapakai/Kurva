@@ -1,0 +1,17 @@
+{
+  "name": "kurva-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "KURVA — Local Intelligence Layer. Backend API + cron crawlers, deployed on Vercel, data in Supabase (shared with Pustakadio, table prefix kurva_).",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "cheerio": "^1.0.0",
+    "rss-parser": "^3.13.0"
+  }
+}
