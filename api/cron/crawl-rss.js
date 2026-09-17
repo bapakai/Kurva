@@ -80,6 +80,8 @@ module.exports = async function handler(req, res) {
         let itemsFetched = 0;
         let itemsInserted = 0;
         let itemsDeduped = 0;
+        let enrichmentFailures = 0;
+        let enrichmentFailureSample = null;
 
         try {
           const provider = source.config?.type === 'tag_page' ? tagPageProvider : rssProvider;
@@ -119,6 +121,8 @@ module.exports = async function handler(req, res) {
               });
             } catch (enrichErr) {
               console.error(`[crawl-rss] Haiku enrichment failed for "${item.title}":`, enrichErr.message);
+              enrichmentFailures++;
+              if (!enrichmentFailureSample) enrichmentFailureSample = enrichErr.message?.slice(0, 200);
               return;
             }
 
@@ -166,6 +170,26 @@ module.exports = async function handler(req, res) {
             .update({ last_crawled_at: new Date().toISOString() })
             .eq('id', source.id);
 
+          // Status is no longer a blanket 'success' just because the source
+          // didn't throw — a run that fetched fine but inserted nothing
+          // because every candidate failed enrichment (e.g. Haiku API down /
+          // credit balance empty) needs to be visibly distinct from a run
+          // that legitimately had nothing new (0 candidates after dedupe).
+          // See the KURVA audit: "success" masking 0-insertion enrichment
+          // failure was a real observability gap.
+          let runStatus = 'success';
+          let runErrorMessage = null;
+          if (itemsInserted === 0) {
+            if (candidates.length === 0) {
+              runStatus = 'empty'; // nothing new to enrich — fine, not a failure
+            } else if (enrichmentFailures > 0) {
+              runStatus = 'degraded';
+              runErrorMessage = `${enrichmentFailures}/${candidates.length} kandidat gagal enrichment. Contoh: ${enrichmentFailureSample}`;
+            } else {
+              runStatus = 'empty'; // enrichment ran fine, everything was irrelevant or deduped post-enrichment
+            }
+          }
+
           if (runRow) {
             await supabase
               .from('kurva_crawl_runs')
@@ -174,7 +198,8 @@ module.exports = async function handler(req, res) {
                 items_fetched: itemsFetched,
                 items_inserted: itemsInserted,
                 items_deduped: itemsDeduped,
-                status: 'success',
+                status: runStatus,
+                error_message: runErrorMessage,
               })
               .eq('id', runRow.id);
           }
