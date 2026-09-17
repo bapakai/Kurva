@@ -12,10 +12,21 @@ const { supabase } = require('../../lib/supabase');
 const { enrichSignal } = require('../../lib/haiku');
 const { parseGeographyPoint, toEwkt } = require('../../lib/geo');
 const { normalizeTitle, hashTitle, isFuzzyDuplicate } = require('../../lib/dedupe');
+const { mapLimit } = require('../../lib/concurrency');
 const rssProvider = require('../../lib/_news-providers/rss');
 const tagPageProvider = require('../../lib/_news-providers/tag_page');
 
 const RETENTION_DAYS = 7;
+
+// Haiku enrichment calls run this many at a time. Vercel serverless
+// functions have a hard wall-clock limit (see maxDuration in vercel.json —
+// 60s, the Hobby plan max); a source with 100+ items run one-at-a-time would
+// blow past that easily once Haiku is actually succeeding (each call is a
+// real network round trip, not instant). Running several concurrently, and
+// inserting each row as soon as it's enriched (rather than batching one big
+// insert at the end), means a timeout only loses whatever was still
+// in-flight — not the whole run.
+const ENRICH_CONCURRENCY = 8;
 
 module.exports = async function handler(req, res) {
   // Vercel Cron sends a GET with a bearer secret when CRON_SECRET is set.
@@ -24,7 +35,11 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const summary = { sources_processed: 0, sources_failed: 0, items_fetched: 0, items_inserted: 0, items_deduped: 0, items_irrelevant: 0 };
+  const summary = { sources_processed: 0, sources_failed: 0, items_fetched: 0, items_inserted: 0, items_deduped: 0, items_irrelevant: 0, items_skipped_time_budget: 0 };
+  // Stay under vercel.json's maxDuration (60s, the Hobby plan max) with a
+  // safety margin, so the function returns gracefully with whatever it
+  // finished instead of getting hard-killed mid-request.
+  const deadline = Date.now() + 50000;
 
   try {
     const { data: regions, error: regionsError } = await supabase
@@ -72,23 +87,28 @@ module.exports = async function handler(req, res) {
           itemsFetched = rawItems.length;
           summary.items_fetched += itemsFetched;
 
-          // Dedupe within this batch too (e.g. same story crawled from 2 sources
-          // in the same run) — track titles we've already decided to insert.
-          const batchTitles = [];
-          const rowsToInsert = [];
-
+          // Cheap dedupe pass first (synchronous, no I/O) — fuzzy-match
+          // against existing active titles AND against each other (e.g. same
+          // story crawled from 2 sources in the same run), before any Haiku
+          // calls happen. Sequential on purpose so it's race-free.
+          const candidates = [];
+          const acceptedTitles = [];
           for (const item of rawItems) {
             if (!item.title) continue;
-
-            const isDup =
-              isFuzzyDuplicate(item.title, existingTitles) ||
-              isFuzzyDuplicate(item.title, batchTitles);
-
-            if (isDup) {
+            if (isFuzzyDuplicate(item.title, existingTitles) || isFuzzyDuplicate(item.title, acceptedTitles)) {
               itemsDeduped++;
               continue;
             }
+            acceptedTitles.push(item.title);
+            candidates.push(item);
+          }
 
+          // Enrich + insert concurrently (bounded) — see ENRICH_CONCURRENCY.
+          await mapLimit(candidates, ENRICH_CONCURRENCY, async (item) => {
+            if (Date.now() > deadline) {
+              summary.items_skipped_time_budget++;
+              return;
+            }
             let enriched;
             try {
               enriched = await enrichSignal({
@@ -99,25 +119,23 @@ module.exports = async function handler(req, res) {
               });
             } catch (enrichErr) {
               console.error(`[crawl-rss] Haiku enrichment failed for "${item.title}":`, enrichErr.message);
-              continue; // skip this item, don't fail the whole source
+              return;
             }
 
             if (!enriched.is_relevant) {
               summary.items_irrelevant++;
-              continue;
+              return;
             }
 
             const normalized = normalizeTitle(enriched.normalized_title || item.title);
             const dedupeHash = hashTitle(normalized);
             if (existingHashes.has(dedupeHash)) {
               itemsDeduped++;
-              continue;
+              return;
             }
-
-            batchTitles.push(item.title);
             existingHashes.add(dedupeHash);
 
-            rowsToInsert.push({
+            const row = {
               region_id: region.id,
               source_id: source.id,
               category: 'berita',
@@ -133,14 +151,15 @@ module.exports = async function handler(req, res) {
               dedupe_hash: dedupeHash,
               published_at: item.published_at,
               expires_at: new Date(Date.now() + RETENTION_DAYS * 86400000).toISOString(),
-            });
-          }
+            };
 
-          if (rowsToInsert.length > 0) {
-            const { error: insertError } = await supabase.from('kurva_local_signals').insert(rowsToInsert);
-            if (insertError) throw insertError;
-            itemsInserted = rowsToInsert.length;
-          }
+            const { error: insertError } = await supabase.from('kurva_local_signals').insert(row);
+            if (insertError) {
+              console.error(`[crawl-rss] insert failed for "${item.title}":`, insertError.message);
+              return;
+            }
+            itemsInserted++;
+          });
 
           await supabase
             .from('kurva_source_registry')

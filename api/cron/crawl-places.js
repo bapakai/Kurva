@@ -18,10 +18,15 @@ const { supabase } = require('../../lib/supabase');
 const { enrichSignal } = require('../../lib/haiku');
 const { parseGeographyPoint, toEwkt } = require('../../lib/geo');
 const { cleanupExpiredSignals } = require('../../lib/cleanup');
+const { mapLimit } = require('../../lib/concurrency');
 const osmProvider = require('../../lib/_places-providers/osm');
 const googleProvider = require('../../lib/_places-providers/google');
 
 const RETENTION_DAYS = 30;
+
+// See the same constant's comment in crawl-rss.js — bounded concurrency +
+// insert-as-you-go so a Vercel function timeout only loses in-flight items.
+const ENRICH_CONCURRENCY = 8;
 
 module.exports = async function handler(req, res) {
   if (process.env.CRON_SECRET && req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -29,7 +34,12 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const summary = { sources_processed: 0, sources_failed: 0, items_fetched: 0, items_inserted: 0, items_refreshed: 0, items_irrelevant: 0 };
+  const summary = { sources_processed: 0, sources_failed: 0, items_fetched: 0, items_inserted: 0, items_refreshed: 0, items_irrelevant: 0, items_skipped_time_budget: 0 };
+  // Stay under vercel.json's maxDuration (60s, the Hobby plan max) with a
+  // safety margin, so the function returns gracefully with whatever it
+  // finished instead of getting hard-killed mid-request. Cleanup (chained
+  // after the main loop, see below) gets the remaining ~10s.
+  const deadline = Date.now() + 45000;
 
   try {
     const { data: regions, error: regionsError } = await supabase
@@ -84,7 +94,7 @@ module.exports = async function handler(req, res) {
 
           const newExpiry = new Date(Date.now() + RETENTION_DAYS * 86400000).toISOString();
           const refreshIds = [];
-          const rowsToInsert = [];
+          const candidates = [];
 
           for (const item of rawItems) {
             if (!item.title || !Number.isFinite(item.lat) || !Number.isFinite(item.lng)) continue;
@@ -96,7 +106,24 @@ module.exports = async function handler(req, res) {
               refreshIds.push(existing.id);
               continue;
             }
+            candidates.push(item);
+          }
 
+          if (refreshIds.length > 0) {
+            const { error: refreshError } = await supabase
+              .from('kurva_local_signals')
+              .update({ expires_at: newExpiry, is_new: false })
+              .in('id', refreshIds);
+            if (refreshError) throw refreshError;
+            itemsRefreshed = refreshIds.length;
+          }
+
+          // Enrich + insert concurrently (bounded) — see ENRICH_CONCURRENCY.
+          await mapLimit(candidates, ENRICH_CONCURRENCY, async (item) => {
+            if (Date.now() > deadline) {
+              summary.items_skipped_time_budget++;
+              return;
+            }
             let enriched;
             try {
               enriched = await enrichSignal({
@@ -107,15 +134,15 @@ module.exports = async function handler(req, res) {
               });
             } catch (enrichErr) {
               console.error(`[crawl-places] Haiku enrichment failed for "${item.title}":`, enrichErr.message);
-              continue;
+              return;
             }
 
             if (!enriched.is_relevant) {
               summary.items_irrelevant++;
-              continue;
+              return;
             }
 
-            rowsToInsert.push({
+            const row = {
               region_id: region.id,
               source_id: source.id,
               category: 'tempat',
@@ -131,23 +158,15 @@ module.exports = async function handler(req, res) {
               dedupe_hash: item.external_id,
               published_at: null,
               expires_at: newExpiry,
-            });
-          }
+            };
 
-          if (refreshIds.length > 0) {
-            const { error: refreshError } = await supabase
-              .from('kurva_local_signals')
-              .update({ expires_at: newExpiry, is_new: false })
-              .in('id', refreshIds);
-            if (refreshError) throw refreshError;
-            itemsRefreshed = refreshIds.length;
-          }
-
-          if (rowsToInsert.length > 0) {
-            const { error: insertError } = await supabase.from('kurva_local_signals').insert(rowsToInsert);
-            if (insertError) throw insertError;
-            itemsInserted = rowsToInsert.length;
-          }
+            const { error: insertError } = await supabase.from('kurva_local_signals').insert(row);
+            if (insertError) {
+              console.error(`[crawl-places] insert failed for "${item.title}":`, insertError.message);
+              return;
+            }
+            itemsInserted++;
+          });
 
           await supabase
             .from('kurva_source_registry')
