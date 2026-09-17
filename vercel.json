@@ -2,5 +2,9 @@
   "crons": [
     { "path": "/api/cron/crawl-rss", "schedule": "0 23 * * *" },
     { "path": "/api/cron/crawl-places", "schedule": "30 23 * * *" }
-  ]
+  ],
+  "functions": {
+    "api/cron/crawl-rss.js": { "maxDuration": 60 },
+    "api/cron/crawl-places.js": { "maxDuration": 60 }
+  }
 }
