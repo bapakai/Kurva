@@ -93,7 +93,7 @@
 <body>
   <div class="kurva-topbar">
     <img class="wordmark" src="/assets/logo/KURVA_wordmark_transparent.png" alt="KURVA" style="height:20px;">
-    <span class="kurva-region-pill" id="regionPill">📍 Bintaro</span>
+    <span class="kurva-region-pill" id="regionPill">📍 Memuat…</span>
   </div>
 
   <div class="jelajah-header">
@@ -115,7 +115,7 @@
     </div>
   </div>
 
-  <div class="map-placeholder">Peta area Bintaro — tampilan interaktif menyusul</div>
+  <div class="map-placeholder" id="mapPlaceholder">Peta kawasan — tampilan interaktif menyusul</div>
 
   <div id="listContainer" class="list">
     <div class="skeleton" style="height:60px;"></div>
@@ -199,7 +199,9 @@
         '<div class="skeleton" style="height:60px;"></div><div class="skeleton" style="height:60px;"></div>';
       try {
         const data = await kurvaFetchSignals({ tier: currentTier });
-        document.getElementById('regionPill').textContent = `📍 ${data.region?.name || 'Bintaro'}`;
+        const regionName = data.region?.name || 'Lokasi tidak diketahui';
+        document.getElementById('regionPill').textContent = `📍 ${regionName}`;
+        document.getElementById('mapPlaceholder').textContent = `Peta area ${regionName} — tampilan interaktif menyusul`;
         allSignals = data.signals || [];
         renderList();
       } catch (err) {

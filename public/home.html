@@ -62,12 +62,10 @@
   </div>
 
   <div class="hero">
-    <h1 id="heroQuestion">Ada apa di Bintaro hari ini?</h1>
+    <h1 id="heroQuestion">Ada apa di sekitarmu hari ini?</h1>
 
-    <div class="region-switcher">
-      <span class="chip active" data-region="bintaro">Bintaro</span>
-      <span class="chip disabled" title="Segera hadir">BSD <span class="soon">SEGERA</span></span>
-      <span class="chip disabled" title="Segera hadir">Kemang <span class="soon">SEGERA</span></span>
+    <div class="region-switcher" id="regionSwitcher">
+      <span class="chip active">Memuat kawasan…</span>
     </div>
 
     <div class="summary-card">
@@ -125,13 +123,43 @@
       } catch (_) { /* storage unavailable — just continue */ }
     })();
 
+    // Region switcher is rendered from /api/regions, not hardcoded — a new
+    // kawasan shows up here automatically once its kurva_regions.status is
+    // 'active' or 'coming_soon', no frontend change needed.
+    async function loadRegionSwitcher(currentSlug) {
+      const el = document.getElementById('regionSwitcher');
+      try {
+        const regions = await kurvaFetchRegions();
+        if (regions.length === 0) { el.innerHTML = ''; return; }
+
+        el.innerHTML = regions.map((r) => {
+          if (r.status !== 'active') {
+            return `<span class="chip disabled" title="Segera hadir">${escapeHtml(r.name)} <span class="soon">SEGERA</span></span>`;
+          }
+          const isActive = r.slug === currentSlug;
+          return `<span class="chip${isActive ? ' active' : ''}" data-region="${r.slug}">${escapeHtml(r.name)}</span>`;
+        }).join('');
+
+        el.querySelectorAll('.chip[data-region]').forEach((chip) => {
+          chip.addEventListener('click', () => {
+            if (chip.classList.contains('active')) return;
+            kurvaSetRegion(chip.dataset.region);
+            loadHome();
+          });
+        });
+      } catch (_) {
+        el.innerHTML = ''; // fail silent — switcher is a nice-to-have, not core
+      }
+    }
+
     async function loadHome() {
       try {
         const data = await kurvaFetchSignals({ tier: 'sekitar' });
         const signals = data.signals || [];
 
-        document.getElementById('heroQuestion').textContent = `Ada apa di ${data.region?.name || 'Bintaro'} hari ini?`;
-        document.getElementById('regionPill').textContent = `📍 ${data.region?.name || 'Bintaro'}`;
+        document.getElementById('heroQuestion').textContent = `Ada apa di ${data.region?.name || 'sekitarmu'} hari ini?`;
+        document.getElementById('regionPill').textContent = `📍 ${data.region?.name || 'Lokasi tidak diketahui'}`;
+        loadRegionSwitcher(data.region?.slug);
 
         const berita = signals.filter((s) => s.category === 'berita').sort((a, b) => b.relevance_score - a.relevance_score);
         const tempat = signals.filter((s) => s.category === 'tempat').sort((a, b) => b.relevance_score - a.relevance_score);
