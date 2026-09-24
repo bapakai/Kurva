@@ -49,6 +49,14 @@
   .onboarding-cta { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: var(--space-3); }
   .onboarding-cta .btn-primary { width: 100%; padding: 16px; font-size: 16px; }
   .onboarding-tagline { color: rgba(255,255,255,0.5); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; margin-top: var(--space-2); }
+
+  /* Desktop: full-bleed gradient still works for a splash screen, just
+     give the centered content a bit more breathing room than the phone
+     padding. No sidebar nav here — onboarding has none to begin with. */
+  @media (min-width: 880px) {
+    .onboarding-screen { padding: var(--space-12) var(--space-6); }
+    .onboarding-copy h1 { font-size: 30px; }
+  }
 </style>
 </head>
 <body>

@@ -88,6 +88,24 @@
   .relevance-box p { margin: 0; font-size: 14px; line-height: 1.5; color: rgba(255,255,255,0.92); }
   .detail-actions { display: flex; gap: var(--space-3); margin-top: var(--space-4); }
   .detail-actions .btn-primary, .detail-actions .btn-secondary { flex: 1; }
+
+  /* Desktop (see kurva.css for the shared sidebar-nav breakpoint): filter
+     chip rows wrap instead of horizontal-scrolling, the map placeholder
+     gets a taller/wider feel, and the detail panel becomes a centered
+     modal instead of a bottom sheet (a sheet sliding up from the bottom
+     edge reads as a mobile-only pattern). */
+  @media (min-width: 880px) {
+    .jelajah-header { padding: var(--space-6) var(--space-6) var(--space-3); }
+    .filter-row { flex-wrap: wrap; overflow: visible; }
+    .map-placeholder { margin: 0 var(--space-6) var(--space-5); height: 220px; }
+    .list { padding: 0 var(--space-6); }
+    .detail-overlay { align-items: center; }
+    .detail-panel {
+      max-width: 480px;
+      border-radius: var(--radius-xl);
+      max-height: 80vh;
+    }
+  }
 </style>
 </head>
 <body>

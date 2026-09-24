@@ -53,6 +53,20 @@
 
   .empty-state { padding: var(--space-8) var(--space-5); text-align: center; color: var(--text-secondary); font-size: 14px; }
   .error-state { margin: 0 var(--space-5) var(--space-5); padding: var(--space-4); background: #FFF4EF; border: 1px solid #FFD8C2; border-radius: var(--radius-md); font-size: 13px; color: #9A3412; }
+
+  /* Desktop (see kurva.css for the shared sidebar-nav breakpoint): chip
+     rows that rely on horizontal swipe on mobile just wrap on a wider
+     screen — nobody swipes with a mouse — and cards/hero get more room. */
+  @media (min-width: 880px) {
+    .hero { padding: var(--space-8) var(--space-6) var(--space-5); }
+    .hero h1 { font-size: 26px; }
+    .region-switcher { flex-wrap: wrap; overflow: visible; }
+    .tempat-scroll { flex-wrap: wrap; overflow: visible; padding: 0 var(--space-6) var(--space-2); }
+    .tempat-card { width: 220px; }
+    .berita-list { padding: 0 var(--space-6); }
+    .section-title { padding: 0 var(--space-6); }
+    .summary-card { padding: var(--space-6); }
+  }
 </style>
 </head>
 <body>
