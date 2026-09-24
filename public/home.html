@@ -17,9 +17,13 @@
 
   .region-switcher { display: flex; gap: var(--space-2); overflow-x: auto; padding-bottom: var(--space-1); margin-bottom: var(--space-5); scrollbar-width: none; }
   .region-switcher::-webkit-scrollbar { display: none; }
-  .region-chip { flex-shrink: 0; }
-  .region-chip.disabled { opacity: 0.55; cursor: default; }
-  .region-chip .soon { font-size: 9px; font-weight: 700; margin-left: 4px; }
+  /* Bug fix: this used to target ".region-chip", a class that was never
+     actually on the rendered chips (they use the shared ".chip" class from
+     kurva.css) — so this styling silently never applied, and the "SEGERA"
+     badge rendered at full size glued to the region name with no gap. */
+  .region-switcher .chip { flex-shrink: 0; }
+  .region-switcher .chip.disabled { opacity: 0.55; cursor: default; }
+  .region-switcher .chip .soon { display: inline-block; font-size: 9px; font-weight: 700; margin-left: 5px; letter-spacing: 0.02em; }
 
   .summary-card {
     background: linear-gradient(135deg, var(--navy) 0%, #0B2A52 100%);
