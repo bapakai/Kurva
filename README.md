@@ -12,10 +12,19 @@ Bintaro diperlakukan sebagai **satu baris data**, bukan satu-satunya kawasan yan
 - **`GET /api/regions`** (baru) — endpoint yang list semua kawasan (`active` + `coming_soon`) dari tabel `kurva_regions`. Ini yang dipakai frontend buat render region-switcher, jadi switcher-nya **data-driven**, bukan 3 chip hardcoded seperti sebelumnya.
 - **Frontend** (`home.html`) fetch `/api/regions` dan render chip per kawasan: `active` → bisa diklik buat pindah kawasan (nyimpen pilihan di `localStorage`, dipakai ulang lewat `kurva-api.js`); `coming_soon` → tampil disabled + label "SEGERA". String "Bintaro" yang tadinya hardcoded di judul/CTA/meta description sudah diganti jadi teks generik ("sekitarmu"/"kawasan ini") yang diisi dari respons API.
 
-**Menambah kawasan baru** (misal BSD atau Kemang, yang datanya sudah ada di `kurva_regions` dengan status `coming_soon`):
-1. `UPDATE kurva_regions SET status='active' WHERE slug='bsd';`
+**Menambah kawasan baru** (misal BSD, Kemang, Ciputat Timur, atau Pejaten — semuanya sudah ada di `kurva_regions` dengan status `coming_soon`):
+1. `UPDATE kurva_regions SET status='active' WHERE slug='ciputat-timur';`
 2. Isi baris `kurva_source_registry` buat kawasan itu (OSM `bbox`, RSS/tag-page berita lokal, dst — sama polanya kayak baris Bintaro yang sudah ada).
 3. Selesai — tidak ada redeploy frontend yang dibutuhkan; region switcher, hero copy, dan resolusi `/api/signals` otomatis ikut kawasan baru begitu status-nya `active`.
+
+**Kawasan berikutnya sudah disiapkan (masih `coming_soon`, belum di-crawl karena cron loop cuma proses region berstatus `active`):**
+
+| Kawasan | Slug | Kota | Sumber "tempat" | Sumber "berita" |
+|---|---|---|---|---|
+| Ciputat Timur | `ciputat-timur` | Tangerang Selatan | OSM Overpass (bbox siap) + Google Places (dormant, sama kayak Bintaro) | Google News RSS + Antara Megapolitan Tangsel (dipakai bareng Bintaro, sama-sama cakupan Tangsel) |
+| Pejaten | `pejaten` | Jakarta Selatan | OSM Overpass (bbox siap) + Google Places (dormant) | Google News RSS |
+
+**Catatan jujur soal koordinat Pejaten**: saya gak nemu centroid resmi kelurahan Pejaten Barat/Timur dari sumber yang bisa diverifikasi (Wikipedia ID/EN gak nyantumin koordinat buat kelurahan ini). Titik yang dipakai sekarang (`-6.2804736, 106.8290129`) itu koordinat landmark mall The Park Pejaten di Jl. Warung Jati Barat — deket dan representatif buat area Pejaten, tapi **tolong di-double-check manual sebelum kawasan ini di-`active`-kan** (misal drop pin manual di Google Maps di titik yang Bapak anggap pusat Pejaten, terus update `kurva_regions.center`). Koordinat Ciputat Timur (`-6.31111, 106.76194`) sumbernya infobox Wikipedia "East Ciputat" — lebih bisa dipercaya karena itu memang centroid kecamatan, bukan landmark.
 
 ## Struktur folder
 
@@ -74,6 +83,17 @@ Yang sudah dikerjakan di `api/cron/crawl-places.js`:
 - **Isolasi kegagalan tetap seperti sebelumnya**: tiap source diproses independen (try/catch per source) — kalau Google gagal (misal API key belum ada), itu gak menjatuhkan run OSM di kawasan yang sama. Ini otomatis memberi efek "OSM sebagai backup" tanpa logic fallback eksplisit tambahan.
 
 **Yang BELUM bisa dijalankan** (di luar kendali kode, sama kayak Anthropic): `lib/_places-providers/google.js` sudah lengkap kodenya (bukan stub) tapi source `Google Places API (Bintaro)` di `kurva_source_registry` sengaja dibiarkan `is_active=false` sampai `GOOGLE_PLACES_API_KEY` diisi & billing Google Cloud aktif — persis pola yang sama dengan pertimbangan billing Anthropic: begitu itu siap, tinggal `UPDATE kurva_source_registry SET is_active=true WHERE source_type='google_places'` dan runtime langsung jalan maksimal tanpa perlu code deploy lagi.
+
+## Layout adaptif desktop
+
+Produk ini tetap mobile-first ("mainnya di mobile site"), tapi sekarang gak lagi keliatan kayak screenshot HP yang di-stretch kalau dibuka di laptop/desktop. Breakpoint `@media (min-width: 880px)` ditambahkan di `assets/kurva.css` (jadi otomatis kepakai di semua halaman, termasuk stub Simpan/Profil) plus penyesuaian kecil di `home.html` dan `jelajah-detail.html`:
+
+- **Bottom nav jadi sidebar kiri** — nav yang didesain buat jempol gak masuk akal dipakai mouse di layar lebar.
+- **Baris chip yang di-scroll horizontal di HP** (region switcher, filter kategori/tier) jadi wrap biasa — orang gak swipe pakai mouse.
+- **Panel detail** di Jelajah jadi modal center (bukan bottom-sheet) di desktop.
+- Card & konten dapat lebih banyak ruang napas (padding, ukuran font, lebar card).
+
+Ini penyesuaian ringan (adaptive), bukan desain desktop terpisah — kalau ke depan mau bikin layout desktop yang lebih niat (multi-kolom grid, peta di sisi kanan konten, dst), itu iterasi lanjutan, bukan yang dikerjakan di update ini.
 
 ## Deploy ke Vercel
 
