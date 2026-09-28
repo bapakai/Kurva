@@ -126,10 +126,14 @@
       <span class="chip" data-cat="acara">Acara</span>
       <span class="chip" data-cat="berita">Berita</span>
     </div>
-    <div class="filter-row" id="tierFilter">
-      <span class="chip active" data-tier="terdekat">Terdekat</span>
+    <!-- Distance tiers only make sense for kategori "Tempat" — Berita/Acara
+         are kawasan-wide context (see kurva_signals_within, fixed
+         2026-09-25), not gated by literal walking distance, so this row is
+         hidden by JS below unless "Tempat" is the active category filter. -->
+    <div class="filter-row" id="tierFilter" style="display:none;">
+      <span class="chip" data-tier="terdekat">Terdekat</span>
       <span class="chip" data-tier="sekitar">Sekitar</span>
-      <span class="chip" data-tier="kawasan">Kawasan</span>
+      <span class="chip active" data-tier="kawasan">Kawasan</span>
     </div>
   </div>
 
@@ -183,14 +187,25 @@
 
     const params = new URLSearchParams(window.location.search);
     let currentCategory = params.get('category') || '';
-    let currentTier = 'terdekat';
+    // Default to the widest tier ('kawasan') rather than 'terdekat' — most
+    // of what's in the feed (berita/acara) ignores this anyway now, and
+    // when "Semua" is selected we don't want to silently hide Tempat items
+    // just because the tier happened to default to the tightest radius.
+    let currentTier = 'kawasan';
     let allSignals = [];
+
+    function syncTierFilterVisibility() {
+      // Only "Tempat" is a real proximity question — see the comment on
+      // #tierFilter in the markup above.
+      document.getElementById('tierFilter').style.display = currentCategory === 'tempat' ? 'flex' : 'none';
+    }
 
     if (currentCategory) {
       document.querySelectorAll('#categoryFilter .chip').forEach((c) => {
         c.classList.toggle('active', c.dataset.cat === currentCategory);
       });
     }
+    syncTierFilterVisibility();
 
     document.getElementById('categoryFilter').addEventListener('click', (e) => {
       const chip = e.target.closest('.chip');
@@ -198,6 +213,7 @@
       document.querySelectorAll('#categoryFilter .chip').forEach((c) => c.classList.remove('active'));
       chip.classList.add('active');
       currentCategory = chip.dataset.cat;
+      syncTierFilterVisibility();
       renderList();
     });
 
@@ -246,7 +262,7 @@
           <div class="body">
             <div class="cat-row">${s.category}${s.is_new ? ' · <span class=\"badge-new\">Baru</span>' : ''}</div>
             <p class="title">${escapeHtml(s.title)}</p>
-            <div class="meta">${s.distance_m ? Math.round(s.distance_m) + ' m dari kamu' : (s.source_name || '')}</div>
+            <div class="meta">${s.category === 'tempat' && s.distance_m != null ? Math.round(s.distance_m) + ' m dari kamu' : (s.source_name || 'Kawasan')}</div>
           </div>
         </div>
       `).join('');
