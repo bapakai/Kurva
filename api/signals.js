@@ -1,16 +1,34 @@
 // api/signals.js
-// GET /api/signals?lat=-6.271&lng=106.739&radius=3000&region=bintaro&category=berita
+// GET /api/signals?region=bintaro&category=berita&tier=sekitar
 //
-// Serves kurva_local_signals near a user location. Uses the PostGIS helper
-// functions already deployed in Supabase (project: pustakadio):
-//   kurva_nearest_active_region(in_lat, in_lng) -> SETOF kurva_regions
+// Serves kurva_local_signals for a kawasan (region). Uses the PostGIS helper
+// function already deployed in Supabase (project: pustakadio):
 //   kurva_signals_within(in_lat, in_lng, in_radius_m, in_region_id) -> TABLE(...)
 //
-// `region` param is optional — if omitted, we resolve the nearest active
-// region from lat/lng (this is what makes KURVA work generically per-user
-// rather than hardcoded to Bintaro, per the product decision in memory).
+// DELIBERATE PRODUCT DECISION (2026-09-28): KURVA is kawasan-first, not
+// GPS-first. The app shows "what's happening in kawasan X", not "what's
+// near my phone right now" — so anyone opening the app sees the same content
+// for a given kawasan regardless of where they physically are. This file
+// used to resolve the region via kurva_nearest_active_region(lat, lng) from
+// the user's real GPS, with a hard ST_DWithin(radius_kawasan_m) cutoff — that
+// silently 404'd for anyone testing/using the app from outside that radius
+// (e.g. Mampang, ~10km from Bintaro's center, outside its 7km kawasan
+// radius), even though Bintaro had plenty of live data. Region is now
+// resolved purely from `?region=<slug>` (explicit pick, e.g. via the region
+// switcher) or defaults to the active pilot kawasan — never from the
+// client's location. `kurva_nearest_active_region` is left in the DB
+// unused; harmless, and available again if a genuine "near me" opt-in
+// feature is ever added deliberately (that would need to be a separate,
+// explicit toggle — not the default path).
+//
+// "tempat" (places) proximity tiers (terdekat/sekitar/kawasan) are now
+// measured from the KAWASAN's own center point (kurva_regions.center), not
+// the user's GPS — i.e. "places within 1km of central Bintaro", a curation
+// radius, not a literal "near me" radius. "berita"/"acara" ignore distance
+// entirely regardless (see kurva_signals_within — kawasan-wide by design).
 
 const { supabase } = require('../lib/supabase');
+const { parseGeographyPoint } = require('../lib/geo');
 
 const RADIUS_PRESETS = {
   terdekat: 1000,
@@ -32,18 +50,12 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const { lat, lng, region: regionSlug, category, radius: radiusParam, tier } = req.query;
-
-  const latNum = Number(lat);
-  const lngNum = Number(lng);
-
-  if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
-    res.status(400).json({ error: 'lat and lng query params are required and must be numbers' });
-    return;
-  }
+  const { region: regionSlug, category, radius: radiusParam, tier } = req.query;
 
   try {
-    // 1. Resolve region: explicit slug wins, otherwise nearest active region.
+    // 1. Resolve region: explicit slug wins, otherwise the active pilot
+    // kawasan (oldest active row — today that's Bintaro, the only one).
+    // No GPS involved — see file header.
     let region;
     if (regionSlug) {
       const { data, error } = await supabase
@@ -55,23 +67,34 @@ module.exports = async function handler(req, res) {
       if (error) throw error;
       region = data;
     } else {
-      const { data, error } = await supabase.rpc('kurva_nearest_active_region', {
-        in_lat: latNum,
-        in_lng: lngNum,
-      });
+      const { data, error } = await supabase
+        .from('kurva_regions')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
       if (error) throw error;
-      region = Array.isArray(data) ? data[0] : data;
+      region = data;
     }
 
     if (!region) {
       res.status(404).json({
         error: 'no_active_region',
-        message: 'Belum ada kawasan KURVA aktif di lokasi ini.',
+        message: regionSlug
+          ? `Kawasan "${regionSlug}" belum aktif atau tidak ditemukan.`
+          : 'Belum ada kawasan KURVA yang aktif.',
       });
       return;
     }
 
+    const center = parseGeographyPoint(region.center);
+    if (!center) {
+      throw new Error(`Kawasan "${region.slug}" tidak punya titik pusat (center) yang valid.`);
+    }
+
     // 2. Resolve radius: explicit ?radius=, or ?tier=terdekat|sekitar|kawasan, or region default.
+    // Anchored at the kawasan's own center — see file header.
     const radiusMeters =
       Number(radiusParam) ||
       RADIUS_PRESETS[tier] ||
@@ -80,8 +103,8 @@ module.exports = async function handler(req, res) {
 
     // 3. Fetch signals within radius via PostGIS function.
     const { data: signals, error: signalsError } = await supabase.rpc('kurva_signals_within', {
-      in_lat: latNum,
-      in_lng: lngNum,
+      in_lat: center.lat,
+      in_lng: center.lng,
       in_radius_m: radiusMeters,
       in_region_id: region.id,
     });
