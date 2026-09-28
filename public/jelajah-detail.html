@@ -262,7 +262,7 @@
           <div class="body">
             <div class="cat-row">${s.category}${s.is_new ? ' · <span class=\"badge-new\">Baru</span>' : ''}</div>
             <p class="title">${escapeHtml(s.title)}</p>
-            <div class="meta">${s.category === 'tempat' && s.distance_m != null ? Math.round(s.distance_m) + ' m dari kamu' : (s.source_name || 'Kawasan')}</div>
+            <div class="meta">${s.category === 'tempat' && s.distance_m != null ? Math.round(s.distance_m) + ' m dari pusat kawasan' : (s.source_name || 'Kawasan')}</div>
           </div>
         </div>
       `).join('');
@@ -275,7 +275,7 @@
     function openDetail(signal) {
       document.getElementById('detailTitle').textContent = signal.title;
       document.getElementById('detailMeta').textContent =
-        `${signal.category.charAt(0).toUpperCase() + signal.category.slice(1)}${signal.source_name ? ' · ' + signal.source_name : ''}${signal.distance_m ? ' · ' + Math.round(signal.distance_m) + ' m' : ''}`;
+        `${signal.category.charAt(0).toUpperCase() + signal.category.slice(1)}${signal.source_name ? ' · ' + signal.source_name : ''}${signal.distance_m ? ' · ' + Math.round(signal.distance_m) + ' m dari pusat kawasan' : ''}`;
       document.getElementById('detailInsight').textContent = signal.summary || 'Belum ada insight untuk item ini.';
       document.getElementById('detailShareBtn').onclick = () => {
         if (signal.source_url && navigator.share) {
