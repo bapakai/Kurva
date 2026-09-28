@@ -26,7 +26,15 @@ const RETENTION_DAYS = 7;
 // inserting each row as soon as it's enriched (rather than batching one big
 // insert at the end), means a timeout only loses whatever was still
 // in-flight — not the whole run.
-const ENRICH_CONCURRENCY = 8;
+// Raised from 8 (2026-09-25) -- this run now processes several local
+// Tangsel/Bintaro-focused portals in the same function call (tangselpos.id,
+// besttangsel.com, tangselmedia.com, radarbanten.co.id, kabartangsel.com,
+// tangerangonline.id, TVNU Pondok Aren, on top of the original Antara +
+// Google News sources), sequentially, one source after another. More
+// sources in the same 60s wall-clock budget needs faster per-source
+// throughput; the deadline check in the mapLimit callback below still drops
+// whatever doesn't fit gracefully rather than timing out the whole request.
+const ENRICH_CONCURRENCY = 15;
 
 module.exports = async function handler(req, res) {
   // Vercel Cron sends a GET with a bearer secret when CRON_SECRET is set.
@@ -117,7 +125,7 @@ module.exports = async function handler(req, res) {
                 category: 'berita',
                 title: item.title,
                 raw_text: item.raw_text,
-                region_name: region.name,
+                region_name: region.city ? `${region.name}, ${region.city}` : region.name, // disambiguates namesake places (e.g. Bintaro Tangsel vs Bintaro Mataram/NTB) — see lib/haiku.js
               });
             } catch (enrichErr) {
               console.error(`[crawl-rss] Haiku enrichment failed for "${item.title}":`, enrichErr.message);

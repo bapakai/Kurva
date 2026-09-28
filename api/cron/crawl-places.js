@@ -27,7 +27,10 @@ const RETENTION_DAYS = 30;
 
 // See the same constant's comment in crawl-rss.js — bounded concurrency +
 // insert-as-you-go so a Vercel function timeout only loses in-flight items.
-const ENRICH_CONCURRENCY = 8;
+// Raised from 8 (2026-09-25) alongside the widened OSM POI_FILTERS list —
+// more candidates per run need more parallel Haiku calls to still fit inside
+// the 45s deadline below on Vercel's 60s Hobby-plan function limit.
+const ENRICH_CONCURRENCY = 15;
 
 // Google Places is the intended primary engine for "tempat" (better coverage
 // + richer metadata); OSM/Overpass is the backup — always-on today since it
@@ -171,7 +174,7 @@ module.exports = async function handler(req, res) {
                 category: 'tempat',
                 title: item.title,
                 raw_text: item.raw_text,
-                region_name: region.name,
+                region_name: region.city ? `${region.name}, ${region.city}` : region.name, // disambiguates namesake places (e.g. Bintaro Tangsel vs Bintaro Mataram/NTB) — see lib/haiku.js
               });
             } catch (enrichErr) {
               console.error(`[crawl-places] Haiku enrichment failed for "${item.title}":`, enrichErr.message);
